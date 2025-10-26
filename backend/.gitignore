@@ -1,0 +1,11 @@
+target
+*.jar
+!/src
+.DS_Store
+/.gradle/
+/.settings/
+/build/
+/bin/
+.classpath
+.project
+/backend/

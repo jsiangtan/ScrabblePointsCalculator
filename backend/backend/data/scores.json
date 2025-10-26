@@ -1,0 +1,10 @@
+[ {
+  "word" : "test",
+  "score" : 4
+}, {
+  "word" : "exciting",
+  "score" : 18
+}, {
+  "word" : "cake",
+  "score" : 11
+} ]
