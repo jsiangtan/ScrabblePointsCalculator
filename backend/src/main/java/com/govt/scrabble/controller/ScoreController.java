@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.govt.scrabble.model.ScoreRecord;
+import com.govt.scrabble.entity.ScoreRecord;
 import com.govt.scrabble.model.ScoreRequest;
 import com.govt.scrabble.model.ScoreResponse;
 import com.govt.scrabble.service.ScoreService;

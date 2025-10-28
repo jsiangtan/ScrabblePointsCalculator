@@ -1,22 +1,22 @@
 package com.govt.scrabble.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.govt.scrabble.model.ScoreRecord;
-import org.junit.jupiter.api.BeforeEach;
+import com.govt.scrabble.entity.ScoreRecord;
+import com.govt.scrabble.repository.ScoreRepository;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import jakarta.transaction.Transactional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,23 +25,13 @@ import static org.junit.jupiter.api.Assertions.*;
 public class ScoreServiceTest {
     @Autowired
     private ScoreService scoreService;
-    
-    @Autowired
-    private ObjectMapper objectMapper;
 
-    @Value("${app.storage.path}") 
-    private String storagePath;
-    
-    @BeforeEach
-    void resetFile() throws IOException {
-        Path testFilePath = Path.of(storagePath);
-        
-        Path parentDir = testFilePath.getParent();
-        if (parentDir != null) {
-            Files.createDirectories(parentDir);
-        }
-        
-        Files.writeString(testFilePath, "[]");
+    @Autowired
+    private ScoreRepository repository;
+
+    @AfterEach
+    void delete() {
+        repository.deleteAll();
     }
 
     @ParameterizedTest(name = "Word: {0} should score {1}")
@@ -61,14 +51,7 @@ public class ScoreServiceTest {
 
         scoreService.saveScore(word, score);
 
-        Path testFilePath = Path.of(storagePath);
-        assertTrue(Files.exists(testFilePath));
-        String jsonContent = Files.readString(testFilePath);
-        
-        List<ScoreRecord> records = objectMapper.readValue(
-            jsonContent, 
-            objectMapper.getTypeFactory().constructCollectionType(List.class, ScoreRecord.class)
-        );
+        List<ScoreRecord> records = repository.findAll();
         
         assertEquals(1, records.size());
         assertEquals(word, records.get(0).getWord());
@@ -80,7 +63,7 @@ public class ScoreServiceTest {
         String word = "DUPE";
         int score = 7; 
         
-        writeInitialScores(List.of(new ScoreRecord(word, score)));
+        repository.save(new ScoreRecord(word, score));
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> {
             scoreService.saveScore(word, score);
@@ -90,14 +73,15 @@ public class ScoreServiceTest {
     }
 
     @Test
+    @Transactional
     void topScores_ReturnsSortedListWithLimit() throws IOException {
         List<ScoreRecord> initialRecords = Arrays.asList(
             new ScoreRecord("LOW", 6),    
             new ScoreRecord("MED", 10),   
             new ScoreRecord("HIGH", 20)
         );
-        
-        writeInitialScores(initialRecords);
+
+        repository.saveAll(initialRecords);
         int limit = 2;
         
         List<ScoreRecord> topList = scoreService.topScores(limit);
@@ -111,12 +95,6 @@ public class ScoreServiceTest {
     @Test
     void topScores_ReturnsEmptyList_WhenFileIsClean() {
         List<ScoreRecord> topList = scoreService.topScores(5);
-
         assertTrue(topList.isEmpty());
-    }
-    
-    private void writeInitialScores(List<ScoreRecord> records) throws IOException {
-        String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(records);
-        Files.writeString(Path.of(storagePath), json);
     }
 }

@@ -1,9 +1,5 @@
 package com.govt.scrabble.service;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -12,20 +8,24 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.govt.scrabble.model.ScoreRecord;
+import com.govt.scrabble.entity.ScoreRecord;
 import com.govt.scrabble.model.ScoreResponse;
+import com.govt.scrabble.repository.ScoreRepository;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class ScoreService {
 
-    @Value("${app.storage.path}")
-    private String storagePath;
+    private final ScoreRepository repository;
+
+    @Autowired
+    public ScoreService(ScoreRepository repository) {
+        this.repository = repository;
+    }
 
     private static final Map<Character, Integer> SCORES = createScoreMap();
 
@@ -61,52 +61,18 @@ public class ScoreService {
         return new ScoreResponse(word, total, breakdown);
     }
 
+    @Transactional
     public void saveScore(String word, int score) {
-        try {
-            List<ScoreRecord> records = readAll();
-            String norm = word == null ? "" : word.trim().toUpperCase();
-            boolean exists = records.stream().anyMatch(r -> {
-                String rw = r.getWord() == null ? "" : r.getWord().trim().toUpperCase();
-                return rw.equals(norm) && r.getScore() == score;
+        repository.findByWordIgnoreCase(word).ifPresent(existing -> {
+                throw new IllegalArgumentException("Record already exists");
             });
-            if (exists) throw new IllegalArgumentException("Record already exists");
-            records.add(new ScoreRecord(word, score));
-            writeAll(records);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        repository.save(new ScoreRecord(word, score));
     }
 
     public List<ScoreRecord> topScores(int limit) {
-        try {
-            List<ScoreRecord> records = readAll();
-            return records.stream()
-                    .sorted(Comparator.comparingInt(ScoreRecord::getScore).reversed())
-                    .limit(limit)
-                    .collect(Collectors.toList());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private List<ScoreRecord> readAll() throws IOException {
-        File f = Path.of(storagePath).toFile();
-        if (!f.exists()) return new ArrayList<>();
-        String json = Files.readString(Path.of(storagePath));
-        ObjectMapper om = new ObjectMapper();
-        try {
-            return om.readValue(json, new TypeReference<List<ScoreRecord>>() {});
-        } catch (IOException e) {
-            // if parsing fails, return empty list
-            return new ArrayList<>();
-        }
-    }
-
-    private void writeAll(List<ScoreRecord> records) throws IOException {
-        File dir = Path.of(storagePath).getParent().toFile();
-        if (!dir.exists()) dir.mkdirs();
-        ObjectMapper om = new ObjectMapper();
-        String json = om.writerWithDefaultPrettyPrinter().writeValueAsString(records);
-        Files.writeString(Path.of(storagePath), json);
+        return repository.findAll().stream()
+            .sorted(Comparator.comparingInt(ScoreRecord::getScore).reversed())
+            .limit(limit)
+            .collect(Collectors.toList());
     }
 }

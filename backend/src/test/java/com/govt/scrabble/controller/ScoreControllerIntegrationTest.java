@@ -1,16 +1,12 @@
 package com.govt.scrabble.controller;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 
-import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -26,8 +22,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.govt.scrabble.model.ScoreRecord;
+import com.govt.scrabble.entity.ScoreRecord;
 import com.govt.scrabble.model.ScoreRequest;
+import com.govt.scrabble.repository.ScoreRepository;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -40,35 +37,24 @@ public class ScoreControllerIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Value("${app.storage.path}") 
-    private String storagePath;
+    @Autowired
+    private ScoreRepository repository;
 
-    private static Path testFilePathStatic;
+    private final List<ScoreRecord> initialRecords = List.of(
+        new ScoreRecord("HELLO", 8),
+        new ScoreRecord("EXCITING", 18)
+    );
 
     @BeforeEach
-    void setupInitialData() throws IOException {
-        Path testFilePath = Path.of(storagePath);
-        testFilePathStatic = testFilePath;
-
-        if (testFilePath.getParent() != null) {
-            Files.createDirectories(testFilePath.getParent());
-        }
-
-        List<ScoreRecord> records = List.of(
-            new ScoreRecord("HELLO", 8),
-            new ScoreRecord("EXCITING", 18)
-        );
-
-        String json = objectMapper.writeValueAsString(records);
-        Files.writeString(testFilePath, json);
+    void setupDatabase() {
+        repository.saveAll(initialRecords);
     }
 
-    @AfterAll
-    static void cleanup() throws IOException {
-        if (testFilePathStatic != null) {
-            Files.deleteIfExists(testFilePathStatic);
-        }
+    @AfterEach
+    void delete() {
+        repository.deleteAll();
     }
+    
     
     @Test
     void testScoreWord_ReturnsScoreResponse() throws Exception {
