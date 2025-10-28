@@ -6,15 +6,15 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,27 +40,34 @@ public class ScoreControllerIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private static Path tempStorageFile;
+    @Value("${app.storage.path}") 
+    private String storagePath;
 
-    @DynamicPropertySource
-    static void registerDynamicProperties(DynamicPropertyRegistry registry) throws IOException {
-        tempStorageFile = Files.createTempFile("scores", ".json");
+    private static Path testFilePathStatic;
 
-        // write initial records to the temp file
-        ObjectMapper mapper = new ObjectMapper();
+    @BeforeEach
+    void setupInitialData() throws IOException {
+        Path testFilePath = Path.of(storagePath);
+        testFilePathStatic = testFilePath;
+
+        if (testFilePath.getParent() != null) {
+            Files.createDirectories(testFilePath.getParent());
+        }
+
         List<ScoreRecord> records = List.of(
             new ScoreRecord("HELLO", 8),
             new ScoreRecord("EXCITING", 18)
         );
-        String json = mapper.writeValueAsString(records);
-        Files.writeString(tempStorageFile, json);
 
-        registry.add("app.storage.path", () -> tempStorageFile.toAbsolutePath().toString());
+        String json = objectMapper.writeValueAsString(records);
+        Files.writeString(testFilePath, json);
     }
 
     @AfterAll
     static void cleanup() throws IOException {
-        Files.deleteIfExists(tempStorageFile);
+        if (testFilePathStatic != null) {
+            Files.deleteIfExists(testFilePathStatic);
+        }
     }
     
     @Test
